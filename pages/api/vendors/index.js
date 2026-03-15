@@ -7,8 +7,13 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
   }
   if (req.method === 'POST') {
-    const { name, email, phone, specialty, org_id } = req.body;
-    const { data, error } = await supabaseAdmin.from('vendors').upsert([{ name, email, phone, specialty, org_id }], { onConflict: 'org_id,email' }).select().single();
+    const { name, email, phone, trade } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email are required' });
+    const { data, error } = await supabaseAdmin
+      .from('vendors')
+      .insert([{ name, email, phone, trade }])
+      .select()
+      .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
   }
