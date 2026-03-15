@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     if (!project_id || !trade) return res.status(400).json({ error: 'project_id and trade are required' });
     const { data: br, error } = await supabaseAdmin
       .from('bid_requests')
-      .insert([{ project_id, trade, description, due_date }])
+      .insert([{ project_id, name: trade, trade, description, deadline: due_date }])
       .select()
       .single();
     if (error) return res.status(500).json({ error: error.message });
