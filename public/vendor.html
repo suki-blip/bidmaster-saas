@@ -4,15 +4,172 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BidMaster — Vendor Portal</title>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg:#f4f6fb; --white:#fff; --ink:#0f1523; --ink2:#2d3748;
-  --muted:#718096; --faint:#a0aec0; --border:#e2e8f0; --border2:#cbd5e0;
-  --gold:#d97706; --gold-l:#f59e0b; --gold-bg:#fffbeb; --gold-b:#fde68a;
-  --green:#059669; --green-bg:#ecfdf5; --green-b:#a7f3d0;
-  --blue:#2563eb; --blue-bg:#eff6ff; --blue-b:#bfdbfe;
-  --red:#dc2626; --red-bg:#fef2f2; --red-b:#fecaca;
-  --purple:#7c3aed; --purple-bg:#f5f3ff; --purple-b:#ddd6fe;
-  --cyan:#0891b2; --cyan-bg:#ecfeff; --cyan-b:#a5f3fc;
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#f4f6fb;color:#0f1523;min-height:100vh}
+.top{background:#1a1f36;color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.top h1{font-size:20px;font-weight:700}
+.vendor-name{font-size:14px;color:#a0aec0}
+.container{max-width:900px;margin:32px auto;padding:0 32px}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:24px;margin-bottom:20px}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.card-head h2{font-size:16px;font-weight:700}
+.btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+.btn-primary{background:#2563eb;color:#fff}
+.btn-primary:hover{background:#1d4ed8}
+.btn-green{background:#059669;color:#fff}
+.btn-green:hover{background:#047857}
+.btn-outline{background:#fff;color:#374151;border:1px solid #d1d5db}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:#ecfdf5;color:#059669}
+.badge-yellow{background:#fffbeb;color:#d97706}
+.badge-blue{background:#eff6ff;color:#2563eb}
+.badge-gray{background:#f3f4f6;color:#6b7280}
+.req-card{border:1px solid #e5e7eb;border-radius:10px;padding:18px;margin-bottom:14px}
+.req-card:hover{border-color:#bfdbfe;background:#f8faff}
+.req-title{font-size:15px;font-weight:700;margin-bottom:8px}
+.req-meta{display:flex;gap:16px;font-size:13px;color:#6b7280;margin-bottom:12px}
+.req-desc{font-size:14px;color:#374151;margin-bottom:14px}
+.bid-form{background:#f8faff;border-radius:8px;padding:14px;margin-top:12px;border:1px solid #bfdbfe}
+.bid-form label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}
+.bid-form input,.bid-form textarea{width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:10px;outline:none}
+.bid-form input:focus,.bid-form textarea:focus{border-color:#2563eb}
+.my-bid{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:14px;margin-top:12px}
+.my-bid .amount{font-size:22px;font-weight:800;color:#059669}
+.empty{text-align:center;padding:48px;color:#9ca3af}
+.empty .icon{font-size:40px;margin-bottom:12px}
+.loading{text-align:center;padding:32px;color:#9ca3af}
+#errorScreen{display:none;text-align:center;padding:80px 32px}
+#errorScreen h2{font-size:22px;font-weight:700;margin-bottom:12px;color:#dc2626}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>🏗️ BidMaster — Vendor Portal</h1>
+  <div class="vendor-name" id="vendorName">Loading...</div>
+</div>
+
+<div id="errorScreen">
+  <div style="font-size:48px">🔗</div>
+  <h2>Invalid or Expired Link</h2>
+  <p style="color:#6b7280">Please contact your contractor for a valid vendor portal link.</p>
+</div>
+
+<div class="container" id="mainContent" style="display:none">
+  <div class="card" style="background:linear-gradient(135deg,#1a1f36,#2563eb);color:#fff;padding:28px">
+    <div style="font-size:13px;opacity:.7;margin-bottom:4px">Welcome back,</div>
+    <div style="font-size:24px;font-weight:800" id="welcomeName">—</div>
+    <div style="font-size:14px;opacity:.7;margin-top:4px" id="welcomeTrade">—</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Open Bid Requests</h2></div>
+    <div id="requestsList"><div class="loading">Loading requests...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>My Submitted Bids</h2></div>
+    <div id="myBidsList"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://bidmaster-saas.vercel.app/api';
+const params = new URLSearchParams(location.search);
+const token = params.get('token');
+let vendorData = null;
+
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  return r.json();
 }
+
+async function init() {
+  if (!token) { showError(); return; }
+  const data = await api('/vendor/' + token);
+  if (!data || data.error || data.message) { showError(); return; }
+  vendorData = data;
+
+  document.getElementById('vendorName').textContent = data.vendor?.name || 'Vendor';
+  document.getElementById('welcomeName').textContent = data.vendor?.name || 'Vendor';
+  document.getElementById('welcomeTrade').textContent = data.vendor?.trade || '';
+  document.getElementById('mainContent').style.display = 'block';
+
+  renderRequests(data.bid_requests || []);
+  renderMyBids(data.bids || []);
+}
+
+function renderRequests(requests) {
+  const el = document.getElementById('requestsList');
+  const open = requests.filter(r => r.status === 'open');
+  if (!open.length) { el.innerHTML = '<div class="empty"><div class="icon">📬</div>No open bid requests at this time</div>'; return; }
+  el.innerHTML = open.map(r => {
+    const myBid = vendorData.bids?.find(b => b.bid_request_id === r.id);
+    return `<div class="req-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="req-title">${r.trade}</div>
+        <span class="badge badge-${r.status==='open'?'green':'gray'}">${r.status}</span>
+      </div>
+      <div class="req-meta">
+        <span>📁 ${r.project?.name||'—'}</span>
+        ${r.due_date?`<span>📅 Due: ${r.due_date}</span>`:''}
+      </div>
+      ${r.description?`<div class="req-desc">${r.description}</div>`:''}
+      ${myBid ? `
+        <div class="my-bid">
+          <div style="font-size:12px;font-weight:600;color:#059669;margin-bottom:4px">✅ Your Bid Submitted</div>
+          <div class="amount">$${Number(myBid.amount).toLocaleString()}</div>
+          ${myBid.notes?`<div style="font-size:13px;color:#374151;margin-top:6px">${myBid.notes}</div>`:''}
+          <div style="font-size:12px;color:#6b7280;margin-top:6px">Status: <b>${myBid.status}</b></div>
+        </div>` : `
+        <div class="bid-form" id="form-${r.id}">
+          <label>Your Bid Amount ($) *</label>
+          <input type="number" id="amt-${r.id}" placeholder="0.00" min="0" step="0.01">
+          <label>Notes (optional)</label>
+          <textarea id="notes-${r.id}" rows="2" placeholder="Describe your approach, timeline, etc."></textarea>
+          <button class="btn btn-green" onclick="submitBid('${r.id}')">Submit Bid</button>
+        </div>`}
+    </div>`;
+  }).join('');
+}
+
+function renderMyBids(bids) {
+  const el = document.getElementById('myBidsList');
+  if (!bids.length) { el.innerHTML = '<div class="empty"><div class="icon">💼</div>No bids submitted yet</div>'; return; }
+  el.innerHTML = bids.map(b => `
+    <div style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:15px">${b.bid_request?.trade||'Bid'}</div>
+          <div style="font-size:13px;color:#6b7280;margin-top:2px">${b.bid_request?.project?.name||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:800;color:#059669">$${Number(b.amount).toLocaleString()}</div>
+          <span class="badge badge-${b.status==='selected'?'green':b.status==='pending'?'yellow':'gray'}">${b.status}</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function submitBid(bidRequestId) {
+  const amount = document.getElementById('amt-' + bidRequestId).value;
+  const notes = document.getElementById('notes-' + bidRequestId).value;
+  if (!amount) return alert('Please enter a bid amount');
+  const r = await api('/vendor/' + token, 'POST', { bid_request_id: bidRequestId, amount: parseFloat(amount), notes });
+  if (r.id || r.success) { init(); }
+  else alert('Error submitting bid: ' + (r.error || JSON.stringify(r)));
+}
+
+function showError() {
+  document.getElementById('errorScreen').style.display = 'block';
+  document.getElementById('mainContent').style.display = 'none';
+}
+
+init();
+</script>
+</body>
+</html>
